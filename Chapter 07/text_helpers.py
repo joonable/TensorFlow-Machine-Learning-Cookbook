@@ -14,7 +14,7 @@ import numpy as np
 # Normalize text
 def normalize_text(texts, stops):
     # Lower case
-    texts = [x.lower() for x in texts]
+    # texts = [x.lower() for x in texts]
 
     # Remove punctuation
     texts = [''.join(c for c in x if c not in string.punctuation) for x in texts]
@@ -77,14 +77,20 @@ def generate_batch_data(sentences, batch_size, window_size, method='skip_gram'):
     label_data = []
     while len(batch_data) < batch_size:
         # select random sentence to start
+        # len(sentences) 이하의 숫자 하나 임의로 선택
         rand_sentence_ix = int(np.random.choice(len(sentences), size=1))
         rand_sentence = sentences[rand_sentence_ix]
+
         # Generate consecutive windows to look at
+        # window size 기준으로 sequence 생성
         window_sequences = [rand_sentence[max((ix-window_size),0):(ix+window_size+1)] for ix, x in enumerate(rand_sentence)]
+
         # Denote which element of each window is the center word of interest
         label_indices = [ix if ix<window_size else window_size for ix,x in enumerate(window_sequences)]
         
         # Pull out center word of interest for each window and create a tuple for each window
+        # 모델의 목적(성격)에 맞게 x, y값 (word pair) 생성
+        # doc2vec 의 경우 rand_sentence_ix 를 더해서 doc_id 도 부여
         if method=='skip_gram':
             batch_and_labels = [(x[y], x[:y] + x[(y+1):]) for x,y in zip(window_sequences, label_indices)]
             # Make it in to a big list of tuples (target word, surrounding word)

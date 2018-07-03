@@ -88,6 +88,7 @@ print('Creating Model')
 # Define Embeddings:
 embeddings = tf.Variable(tf.random_uniform([vocabulary_size, embedding_size], -1.0, 1.0))
 doc_embeddings = tf.Variable(tf.random_uniform([len(texts), doc_embedding_size], -1.0, 1.0))
+# assert(len(target)==len(texts))
 
 # NCE loss parameters
 nce_weights = tf.Variable(tf.truncated_normal([vocabulary_size, concatenated_size],
@@ -105,22 +106,34 @@ embed = tf.zeros([batch_size, embedding_size])
 for element in range(window_size):
     embed += tf.nn.embedding_lookup(embeddings, x_inputs[:, element])
 
-doc_indices = tf.slice(x_inputs, [0,window_size],[batch_size,1])
-doc_embed = tf.nn.embedding_lookup(doc_embeddings,doc_indices)
+# word, word, word  doc_id      doc_id
+# word, word, word  doc_id      doc_id
+# word, word, word  doc_id  =>  doc_id
+# word, word, word  doc_id      doc_id
+# word, word, word  doc_id      doc_id
+doc_indices = tf.slice(input_=x_inputs, begin=[0, window_size], size=[batch_size, 1])
+doc_embed = tf.nn.embedding_lookup(doc_embeddings, doc_indices)
 
 # concatenate embeddings
 final_embed = tf.concat(1, [embed, tf.squeeze(doc_embed)])
+# word_emb, word_emb, word_emb      doc_emb
+# word_emb, word_emb, word_emb      doc_emb
+# word_emb, word_emb, word_emb  =>  doc_emb
+# word_emb, word_emb, word_emb      doc_emb
+# word_emb, word_emb, word_emb      doc_emb
+
 
 # Get loss from prediction
 loss = tf.reduce_mean(tf.nn.nce_loss(nce_weights, nce_biases, final_embed, y_target,
-                                     num_sampled, vocabulary_size))
+                                     num_sampled = num_sampled, num_classes = vocabulary_size))
                                      
 # Create optimizer
 optimizer = tf.train.GradientDescentOptimizer(learning_rate=model_learning_rate)
 train_step = optimizer.minimize(loss)
 
 # Cosine similarity between words
-norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings), 1, keep_dims=True))
+# cosine similarity 를 이용하여 valid dataset의 similarity 구함
+norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings), axis=1, keep_dims=True))
 normalized_embeddings = embeddings / norm
 valid_embeddings = tf.nn.embedding_lookup(normalized_embeddings, valid_dataset)
 similarity = tf.matmul(valid_embeddings, normalized_embeddings, transpose_b=True)
@@ -139,6 +152,19 @@ loss_x_vec = []
 for i in range(generations):
     batch_inputs, batch_labels = text_helpers.generate_batch_data(text_data, batch_size,
                                                                   window_size, method='doc2vec')
+    '''
+        x = [['i', 'am', 2],
+         ['am', 'sorry', 2],
+         ['sorry', 'but', 2],
+         ['but', 'i', 2],
+         ['i', 'love', 2],
+         ['love', 'you', 2],
+         ['you', '다', 2]]
+        // 여기서 2는 doc_id
+
+        y = ['sorry', 'but', 'i', 'love', 'you']
+    '''
+
     feed_dict = {x_inputs : batch_inputs, y_target : batch_labels}
 
     # Run the train step
@@ -206,7 +232,7 @@ log_embed = tf.zeros([logistic_batch_size, embedding_size])
 for element in range(max_words):
     log_embed += tf.nn.embedding_lookup(embeddings, log_x_inputs[:, element])
 
-log_doc_indices = tf.slice(log_x_inputs, [0,max_words],[logistic_batch_size,1])
+log_doc_indices = tf.slice(log_x_inputs, [0,max_words], [logistic_batch_size,1])
 log_doc_embed = tf.nn.embedding_lookup(doc_embeddings,log_doc_indices)
 
 # concatenate embeddings
@@ -251,7 +277,7 @@ for i in range(10000):
     rand_x = np.hstack((rand_x, np.transpose([rand_x_doc_indices])))
     rand_y = np.transpose([target_train[rand_index]])
     
-    feed_dict = {log_x_inputs : rand_x, log_y_target : rand_y}
+    feed_dict = {log_x_inputs: rand_x, log_y_target: rand_y}
     sess.run(logistic_train_step, feed_dict=feed_dict)
     
     # Only record loss and accuracy every 100 generations
