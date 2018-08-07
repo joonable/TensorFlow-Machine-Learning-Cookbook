@@ -26,7 +26,7 @@ from nltk.corpus import stopwords
 from tensorflow.python.framework import ops
 ops.reset_default_graph()
 
-os.chdir(os.path.dirname(os.path.realpath(__file__)))
+# os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
 # Make a saving directory if it doesn't exist
 data_folder_name = 'temp'
@@ -39,7 +39,7 @@ sess = tf.Session()
 # Declare model parameters
 batch_size = 500
 vocabulary_size = 7500
-generations = 100000
+generations = 100000    # iterations, NOT epochs
 model_learning_rate = 0.001
 
 embedding_size = 200   # Word embedding size
@@ -150,19 +150,27 @@ print('Starting Training')
 loss_vec = []
 loss_x_vec = []
 for i in range(generations):
+
     batch_inputs, batch_labels = text_helpers.generate_batch_data(text_data, batch_size,
                                                                   window_size, method='doc2vec')
     '''
-        x = [['i', 'am', 2],
-         ['am', 'sorry', 2],
-         ['sorry', 'but', 2],
-         ['but', 'i', 2],
-         ['i', 'love', 2],
-         ['love', 'you', 2],
-         ['you', '다', 2]]
-        // 여기서 2는 doc_id
+    batch_size가 넘지 않을 떄 까지 임의의 문장을 계속 뽑는다
+    
+    batch_inputs = [
+        [4026, 1095,  679, 8818],
+        [1095,  679,  755, 8818],
+        [ 679,  755, 1132, 8818],
+        ....
+        [1972, 2849,    0, 1494],
+        [2849,    0,    0, 1494],
+        [   0,    0,   45, 1494] ]
+        
+    batch_input_format = [word_seq_0, word_seq_1, word_seq2, doc_idx]
 
-        y = ['sorry', 'but', 'i', 'love', 'you']
+    batch_labels = ['755', '1132', .... ,'45', '14']
+    batch_label_format = [word_seq_3, word_seq_4, .... ]
+
+    len(batch_inputs, batch_labels) == batch_size
     '''
 
     feed_dict = {x_inputs : batch_inputs, y_target : batch_labels}
